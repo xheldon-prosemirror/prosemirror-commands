@@ -4,6 +4,8 @@ import {Selection, TextSelection, NodeSelection, AllSelection} from "prosemirror
 
 // :: (EditorState, ?(tr: Transaction)) → bool
 // Delete the selection, if there is one.
+//
+// @cn 删除选区，如果存在的话。
 export function deleteSelection(state, dispatch) {
   if (state.selection.empty) return false
   if (dispatch) dispatch(state.tr.deleteSelection().scrollIntoView())
@@ -18,6 +20,10 @@ export function deleteSelection(state, dispatch) {
 // the document structure by lifting it out of its parent or moving it
 // into a parent of the previous block. Will use the view for accurate
 // (bidi-aware) start-of-textblock detection if given.
+//
+// @cn 如果选区是空（光标）而且在一个文本块的起始位置，则试着减少光标所在的块级节点和该块级节点之前的节点之间的距离。如果存在一个块级节点直接位于
+// 光标所在的块级节点之前而且能够被连接的话，则连接他们。如果不存在，则尝试通过将光标所在的块级节点从其父级节点中提升一级或者将其移动到父级节点之前的
+// 块级节点中的方式来尝试将选择的块级节点（即光标所在的块级及诶单）移动的更接近文档中的下一个节点。如果给定 view 参数，则将会使用之以获取准确的（用来处理 bidi 的）文本块起始方向。
 export function joinBackward(state, dispatch, view) {
   let {$cursor} = state.selection
   if (!$cursor || (view ? !view.endOfTextblock("backward", state)
@@ -74,6 +80,11 @@ function textblockAt(node, side) {
 // [`joinBackward`](#commands.joinBackward) or other deleting
 // commands, as a fall-back behavior when the schema doesn't allow
 // deletion at the selected point.
+//
+// @cn 当选区是空且在一个文本块的起始位置的时候，如果可以的话，选中位于文本块之前的节点。这个行为通常倾向于在 [`joinBackward`](#commands.joinBackward)
+// 之后绑定向后删除键或者其他删除命令，以作为一个回退方案，如果 schema 不允许在选择的点进行删除操作的话。
+//
+// @comment 向后删除键在 Mac 上是 Ctrl + D，会删除光标右侧的内容。
 export function selectNodeBackward(state, dispatch, view) {
   let {$head, empty} = state.selection, $cut = $head
   if (!empty) return false
@@ -103,6 +114,9 @@ function findCutBefore($pos) {
 // and the one after it, either by joining them or by moving the other
 // block closer to this one in the tree structure. Will use the view
 // for accurate start-of-textblock detection if given.
+//
+// @cn 如果选区是空而且光标在一个文本块的结尾处，则尝试减少或者移除当前块级元素和它之后的块级元素之间边界。可以通过连接他们或者在树中移动挨着当前块级元素的
+// 其他块级元素。将会使用给定的 view（如果有）以获取准确的文本块起始方向。
 export function joinForward(state, dispatch, view) {
   let {$cursor} = state.selection
   if (!$cursor || (view ? !view.endOfTextblock("forward", state)
@@ -147,6 +161,9 @@ export function joinForward(state, dispatch, view) {
 // [`joinForward`](#commands.joinForward) and similar deleting
 // commands, to provide a fall-back behavior when the schema doesn't
 // allow deletion at the selected point.
+//
+// @cn 当选区是空且在一个文本块的结尾位置的时候，如果可以的话，选中位于文本块之后的节点。这个行为通常倾向于在 [`joinForward`](#commands.joinForward)
+// 之后绑定删除键或者其他类似的删除命令，以作为一个回退方案，如果 schema 不允许在选择的点进行删除操作的话。
 export function selectNodeForward(state, dispatch, view) {
   let {$head, empty} = state.selection, $cut = $head
   if (!empty) return false
@@ -175,6 +192,8 @@ function findCutAfter($pos) {
 // Join the selected block or, if there is a text selection, the
 // closest ancestor block of the selection that can be joined, with
 // the sibling above it.
+//
+// @cn 连接选择的块级节点，或者如果有文本选区，则连接与选区最接近的可连接的祖先节点和它之前的同级节点。
 export function joinUp(state, dispatch) {
   let sel = state.selection, nodeSel = sel instanceof NodeSelection, point
   if (nodeSel) {
@@ -195,6 +214,8 @@ export function joinUp(state, dispatch) {
 // :: (EditorState, ?(tr: Transaction)) → bool
 // Join the selected block, or the closest ancestor of the selection
 // that can be joined, with the sibling after it.
+//
+// @cn 连接选择的块级节点，或者连接与选区最接近的可连接的祖先节点和它之后的同级节点。
 export function joinDown(state, dispatch) {
   let sel = state.selection, point
   if (sel instanceof NodeSelection) {
@@ -212,6 +233,8 @@ export function joinDown(state, dispatch) {
 // :: (EditorState, ?(tr: Transaction)) → bool
 // Lift the selected block, or the closest ancestor block of the
 // selection that can be lifted, out of its parent node.
+//
+// @cn 从父级节点中提升选择的块级节点，或者提升与选区最接近的可提升的祖先节点。
 export function lift(state, dispatch) {
   let {$from, $to} = state.selection
   let range = $from.blockRange($to), target = range && liftTarget(range)
@@ -224,6 +247,8 @@ export function lift(state, dispatch) {
 // If the selection is in a node whose type has a truthy
 // [`code`](#model.NodeSpec.code) property in its spec, replace the
 // selection with a newline character.
+//
+// @cn 如果选区在一个配置对象中 [`code`](#model.NodeSpec.code) 属性为真值的节点类型中，则用一个换行符替换选区。
 export function newlineInCode(state, dispatch) {
   let {$head, $anchor} = state.selection
   if (!$head.parent.type.spec.code || !$head.sameParent($anchor)) return false
@@ -243,6 +268,9 @@ function defaultBlockAt(match) {
 // When the selection is in a node with a truthy
 // [`code`](#model.NodeSpec.code) property in its spec, create a
 // default block after the code block, and move the cursor there.
+//
+// @cn 如果选区在一个配置对象中 [`code`](#model.NodeSpec.code) 属性为真值的节点类型中，则在当前代码块之后新建一个默认的块级节点，
+// 然后将光标移动到其内。
 export function exitCode(state, dispatch) {
   let {$head, $anchor} = state.selection
   if (!$head.parent.type.spec.code || !$head.sameParent($anchor)) return false
@@ -259,6 +287,8 @@ export function exitCode(state, dispatch) {
 // :: (EditorState, ?(tr: Transaction)) → bool
 // If a block node is selected, create an empty paragraph before (if
 // it is its parent's first child) or after it.
+//
+// @cn 如果一个块级节点被选中，则在其前面（如果它是其父级节点的第一个子元素）新建一个段落，或者其后面。
 export function createParagraphNear(state, dispatch) {
   let {$from, $to} = state.selection
   if ($from.parent.inlineContent || $to.parent.inlineContent) return false
@@ -276,6 +306,8 @@ export function createParagraphNear(state, dispatch) {
 // :: (EditorState, ?(tr: Transaction)) → bool
 // If the cursor is in an empty textblock that can be lifted, lift the
 // block.
+//
+// @cn 如果光标在一个空的可以被提升的文本块中，那么提升这个文本块。
 export function liftEmptyBlock(state, dispatch) {
   let {$cursor} = state.selection
   if (!$cursor || $cursor.parent.content.size) return false
@@ -295,6 +327,8 @@ export function liftEmptyBlock(state, dispatch) {
 // :: (EditorState, ?(tr: Transaction)) → bool
 // Split the parent block of the selection. If the selection is a text
 // selection, also delete its content.
+//
+// @cn 分割选区的父级节点。如果选区是一个文本选区，还会同时删除选区内容。
 export function splitBlock(state, dispatch) {
   let {$from, $to} = state.selection
   if (state.selection instanceof NodeSelection && state.selection.node.isBlock) {
@@ -330,6 +364,8 @@ export function splitBlock(state, dispatch) {
 // :: (EditorState, ?(tr: Transaction)) → bool
 // Acts like [`splitBlock`](#commands.splitBlock), but without
 // resetting the set of active marks at the cursor.
+//
+// @cn 行为和 [`splitBlock`](#commands.splitBlock) 类似，不过不会重置光标处已经激活的 marks 集合。
 export function splitBlockKeepMarks(state, dispatch) {
   return splitBlock(state, dispatch && (tr => {
     let marks = state.storedMarks || (state.selection.$to.parentOffset && state.selection.$from.marks())
@@ -341,6 +377,8 @@ export function splitBlockKeepMarks(state, dispatch) {
 // :: (EditorState, ?(tr: Transaction)) → bool
 // Move the selection to the node wrapping the current selection, if
 // any. (Will not select the document node.)
+//
+// @cn 移动选区到包裹当前选区的节点中（如果有的话，不会选择文档根节点）。
 export function selectParentNode(state, dispatch) {
   let {$from, to} = state.selection, pos
   let same = $from.sharedDepth(to)
@@ -352,6 +390,8 @@ export function selectParentNode(state, dispatch) {
 
 // :: (EditorState, ?(tr: Transaction)) → bool
 // Select the whole document.
+//
+// @cn 选择整个文档。
 export function selectAll(state, dispatch) {
   if (dispatch) dispatch(state.tr.setSelection(new AllSelection(state.doc)))
   return true
@@ -410,6 +450,8 @@ function deleteBarrier(state, $cut, dispatch) {
 // :: (NodeType, ?Object) → (state: EditorState, dispatch: ?(tr: Transaction)) → bool
 // Wrap the selection in a node of the given type with the given
 // attributes.
+//
+// @cn 用带有给定 attributes 的给定类型的节点来包裹选区。
 export function wrapIn(nodeType, attrs) {
   return function(state, dispatch) {
     let {$from, $to} = state.selection
@@ -423,6 +465,8 @@ export function wrapIn(nodeType, attrs) {
 // :: (NodeType, ?Object) → (state: EditorState, dispatch: ?(tr: Transaction)) → bool
 // Returns a command that tries to set the selected textblocks to the
 // given node type with the given attributes.
+//
+// @cn 返回一个尝试将选中的文本块设置为带有给定 attributes 的给定节点类型的命令。
 export function setBlockType(nodeType, attrs) {
   return function(state, dispatch) {
     let {from, to} = state.selection
@@ -464,6 +508,10 @@ function markApplies(doc, ranges, type) {
 // selection is empty, this applies to the [stored
 // marks](#state.EditorState.storedMarks) instead of a range of the
 // document.
+//
+// @cn 新建一个命令函数，控制带有给定 attributes 的给定 mark 的开关。如果当前选区不支持这个的 mark 将会返回 `false`。
+// 这个过程将会移除在选区中存在的任何该种类型的 mark，或者如果没有的话则添加之。如果选区是空，则这将会应用到 stored
+// marks](#state.EditorState.storedMarks) 中，而不是文档的某个范围。
 export function toggleMark(markType, attrs) {
   return function(state, dispatch) {
     let {empty, $cursor, ranges} = state.selection
@@ -537,6 +585,9 @@ function wrapDispatchForJoin(dispatch, isJoinable) {
 // when the `isJoinable` predicate returns true for them or, if an
 // array of strings was passed, if their node type name is in that
 // array.
+//
+// @cn 封装一个命令，以便当它产生一个 transform 以引起两个可连接的节点彼此相邻时能够被连接。
+// 当节点具有相同类型并且当 `isJoinable` 参数是函数时返回 true 或者参数是一个字符串数组而这些节点名在这个数组中时，节点将会被认为是可连接的。
 export function autoJoin(command, isJoinable) {
   if (Array.isArray(isJoinable)) {
     let types = isJoinable
@@ -548,6 +599,8 @@ export function autoJoin(command, isJoinable) {
 // :: (...[(EditorState, ?(tr: Transaction), ?EditorView) → bool]) → (EditorState, ?(tr: Transaction), ?EditorView) → bool
 // Combine a number of command functions into a single function (which
 // calls them one by one until one returns true).
+//
+// @cn 组合多个命令函数到一个单独的函数（一个一个的调用这些命令，直到其中一个返回 true）。
 export function chainCommands(...commands) {
   return function(state, dispatch, view) {
     for (let i = 0; i < commands.length; i++)
@@ -564,12 +617,21 @@ let del = chainCommands(deleteSelection, joinForward, selectNodeForward)
 // Binds the following keys (when multiple commands are listed, they
 // are chained with [`chainCommands`](#commands.chainCommands)):
 //
+// @cn 一个基本的按键映射，包含不特定于任何 schema 的按键绑定。绑定包含下列按键（当多个命令被列出来的时候，它们被 [`chainCommands`](#commands.chainCommands)
+// 所链接起来）。
+//
 // * **Enter** to `newlineInCode`, `createParagraphNear`, `liftEmptyBlock`, `splitBlock`
+// * @cn **Enter** 绑定到 `newlineInCode`, `createParagraphNear`, `liftEmptyBlock`, `splitBlock`
 // * **Mod-Enter** to `exitCode`
+// * @cn **Mod-Enter** 绑定到 `exitCode`
 // * **Backspace** and **Mod-Backspace** to `deleteSelection`, `joinBackward`, `selectNodeBackward`
+// * @cn **Backspace** 及 **Mod-Backspace** 绑定到 `deleteSelection`, `joinBackward`, `selectNodeBackward`
 // * **Delete** and **Mod-Delete** to `deleteSelection`, `joinForward`, `selectNodeForward`
+// * @cn **Delete** 及 **Mod-Delete** 绑定到 `deleteSelection`, `joinForward`, `selectNodeForward`
 // * **Mod-Delete** to `deleteSelection`, `joinForward`, `selectNodeForward`
+// * @cn **Mod-Delete** 绑定到 `deleteSelection`, `joinForward`, `selectNodeForward`
 // * **Mod-a** to `selectAll`
+// * @cn **Mod-a** 绑定到 `selectAll`
 export let pcBaseKeymap = {
   "Enter": chainCommands(newlineInCode, createParagraphNear, liftEmptyBlock, splitBlock),
   "Mod-Enter": exitCode,
@@ -585,6 +647,9 @@ export let pcBaseKeymap = {
 // **Ctrl-d** like Delete, **Alt-Backspace** like Ctrl-Backspace, and
 // **Ctrl-Alt-Backspace**, **Alt-Delete**, and **Alt-d** like
 // Ctrl-Delete.
+//
+// @cn `pcBaseKeymap` 的复制版，和 Backspace 一样绑定了 **Ctrl-h**，和 Delete 一样绑定了 **Ctrl-d**，
+// 和 Ctrl-Backspace 一样绑定了 **Alt-Backspace**，和 Ctrl-Delete 一样绑定了 **Ctrl-Alt-Backspace**, **Alt-Delete**, 和 **Alt-d**
 export let macBaseKeymap = {
   "Ctrl-h": pcBaseKeymap["Backspace"],
   "Alt-Backspace": pcBaseKeymap["Mod-Backspace"],
@@ -603,4 +668,6 @@ const mac = typeof navigator != "undefined" ? /Mac/.test(navigator.platform)
 // Depending on the detected platform, this will hold
 // [`pcBasekeymap`](#commands.pcBaseKeymap) or
 // [`macBaseKeymap`](#commands.macBaseKeymap).
+//
+// @cn 取决于删除操作的平台，该值将指向 [`pcBasekeymap`](#commands.pcBaseKeymap) 或者 [`macBaseKeymap`](#commands.macBaseKeymap)。
 export let baseKeymap = mac ? macBaseKeymap : pcBaseKeymap
