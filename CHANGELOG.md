@@ -1,3 +1,35 @@
+## 1.1.9 (2021-06-07)
+
+### Bug fixes
+
+Fix a regression where `splitBlock` could crash when splitting at the end of a non-default block.
+
+## 1.1.8 (2021-05-22)
+
+### Bug fixes
+
+Fix a crash in `splitBlock` that occurred with certain types of schemas.
+
+## 1.1.7 (2021-02-22)
+
+### Bug fixes
+
+Fix a regression where `createParagraphNear` no longer fired for gap cursor selections.
+
+## 1.1.6 (2021-02-10)
+
+### Bug fixes
+
+Improve behavior of enter when the entire document is selected.
+
+## 1.1.5 (2021-01-14)
+
+### Bug fixes
+
+`joinBackward` and `joinForward` will now, when the textblock after the cut can't be moved into the structure before the cut, try to just join the inline content onto the last child in the structure before the cut.
+
+`toggleMark` will now skip whitespace at the start and end of the selection when adding a mark.
+
 ## 1.1.4 (2020-04-15)
 
 ### Bug fixes

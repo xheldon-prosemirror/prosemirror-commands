@@ -290,9 +290,9 @@ export function exitCode(state, dispatch) {
 //
 // @cn 如果一个块级节点被选中，则在其前面（如果它是其父级节点的第一个子元素）新建一个段落，或者其后面。
 export function createParagraphNear(state, dispatch) {
-  let {$from, $to} = state.selection
-  if ($from.parent.inlineContent || $to.parent.inlineContent) return false
-  let type = defaultBlockAt($from.parent.contentMatchAt($to.indexAfter()))
+  let sel = state.selection, {$from, $to} = sel
+  if (sel instanceof AllSelection || $from.parent.inlineContent || $to.parent.inlineContent) return false
+  let type = defaultBlockAt($to.parent.contentMatchAt($to.indexAfter()))
   if (!type || !type.isTextblock) return false
   if (dispatch) {
     let side = (!$from.parentOffset && $to.index() < $to.parent.childCount ? $from : $to).pos
@@ -342,7 +342,7 @@ export function splitBlock(state, dispatch) {
   if (dispatch) {
     let atEnd = $to.parentOffset == $to.parent.content.size
     let tr = state.tr
-    if (state.selection instanceof TextSelection) tr.deleteSelection()
+    if (state.selection instanceof TextSelection || state.selection instanceof AllSelection) tr.deleteSelection()
     let deflt = $from.depth == 0 ? null : defaultBlockAt($from.node(-1).contentMatchAt($from.indexAfter(-1)))
     let types = atEnd && deflt ? [{type: deflt}] : null
     let can = canSplit(tr.doc, tr.mapping.map($from.pos), 1, types)
@@ -352,9 +352,11 @@ export function splitBlock(state, dispatch) {
     }
     if (can) {
       tr.split(tr.mapping.map($from.pos), 1, types)
-      if (!atEnd && !$from.parentOffset && $from.parent.type != deflt &&
-          $from.node(-1).canReplace($from.index(-1), $from.indexAfter(-1), Fragment.from(deflt.create(), $from.parent)))
-        tr.setNodeMarkup(tr.mapping.map($from.before()), deflt)
+      if (!atEnd && !$from.parentOffset && $from.parent.type != deflt) {
+        let first = tr.mapping.map($from.before()), $first = tr.doc.resolve(first)
+        if ($from.node(-1).canReplaceWith($first.index(), $first.index() + 1, deflt))
+          tr.setNodeMarkup(tr.mapping.map($from.before()), deflt)
+      }
     }
     dispatch(tr.scrollIntoView())
   }
@@ -419,7 +421,8 @@ function deleteBarrier(state, $cut, dispatch) {
   if (before.type.spec.isolating || after.type.spec.isolating) return false
   if (joinMaybeClear(state, $cut, dispatch)) return true
 
-  if ($cut.parent.canReplace($cut.index(), $cut.index() + 1) &&
+  let canDelAfter = $cut.parent.canReplace($cut.index(), $cut.index() + 1)
+  if (canDelAfter &&
       (conn = (match = before.contentMatchAt(before.childCount)).findWrapping(after.type)) &&
       match.matchType(conn[0] || after.type).validEnd) {
     if (dispatch) {
@@ -440,6 +443,26 @@ function deleteBarrier(state, $cut, dispatch) {
   if (target != null && target >= $cut.depth) {
     if (dispatch) dispatch(state.tr.lift(range, target).scrollIntoView())
     return true
+  }
+
+  if (canDelAfter && after.isTextblock && textblockAt(before, "end")) {
+    let at = before, wrap = []
+    for (;;) {
+      wrap.push(at)
+      if (at.isTextblock) break
+      at = at.lastChild
+    }
+    if (at.canReplace(at.childCount, at.childCount, after.content)) {
+      if (dispatch) {
+        let end = Fragment.empty
+        for (let i = wrap.length - 1; i >= 0; i--) end = Fragment.from(wrap[i].copy(end))
+        let tr = state.tr.step(new ReplaceAroundStep($cut.pos - wrap.length, $cut.pos + after.nodeSize,
+                                                     $cut.pos + 1, $cut.pos + after.nodeSize - 1,
+                                                     new Slice(end, wrap.length, 0), 0, true))
+        dispatch(tr.scrollIntoView())
+      }
+      return true
+    }
   }
 
   return false
@@ -530,8 +553,15 @@ export function toggleMark(markType, attrs) {
         }
         for (let i = 0; i < ranges.length; i++) {
           let {$from, $to} = ranges[i]
-          if (has) tr.removeMark($from.pos, $to.pos, markType)
-          else tr.addMark($from.pos, $to.pos, markType.create(attrs))
+          if (has) {
+            tr.removeMark($from.pos, $to.pos, markType)
+          } else {
+            let from = $from.pos, to = $to.pos, start = $from.nodeAfter, end = $to.nodeBefore
+            let spaceStart = start && start.isText ? /^\s*/.exec(start.text)[0].length : 0
+            let spaceEnd = end && end.isText ? /\s*$/.exec(end.text)[0].length : 0
+            if (from + spaceStart < to) { from += spaceStart; to -= spaceEnd }
+            tr.addMark(from, to, markType.create(attrs))
+          }
         }
         dispatch(tr.scrollIntoView())
       }
